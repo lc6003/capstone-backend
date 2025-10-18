@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const User = require('./models/User')
@@ -172,6 +173,78 @@ app.post('/api/login', async(req, res) => {
         console.error('Login error:', error);
         res.status(500).json({
             error: 'An error occurred during login'
+        });
+    }
+});
+
+app.post('/api/verify-username', async (req, res) => {
+    try {
+        const { username } = req.body;
+
+        if(!username) {
+            return res.status(400).json({
+                error: 'Please provide your username'
+            });
+        }
+        const user = await User.findOne({ username });
+
+        if(!user) {
+            return res.status(404).json({
+                error: 'Username not found'
+            });
+        }
+
+        res.json({
+            message: 'Username verified',
+            email: user.email
+        });
+    }   catch (error) {
+        console.error('Verify username error:', error);
+        res.status(500).json({
+            error: 'An error occurred. Please try again.'
+        });
+    }
+});
+
+app.post('/api/forgot-password-reset', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        if(!username || !password ) {
+            return res.status(400).json({
+                error: 'Please provide username and new password'
+            });
+        }
+
+        if(password.length < 6){
+            return res.status(400).json({
+                error: 'Password must be at least 6 characters'
+            });
+        }
+
+        const user = await User.findOne({ username });
+
+        if(!user){
+            return res.status(404).json({
+                error: 'Username not found'
+            });
+        }
+
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        user.password = hashedPassword;
+        await user.save();
+
+        console.log('Password reset successful for:', username);
+
+        res.json({ 
+            message: 'Password has been reset successfully' 
+        });
+    }   catch (error){
+        console.error('Forgot password reset error:', error);
+        res.status(500).json({
+            error: 'An error occurred. Please try again.'
         });
     }
 });
