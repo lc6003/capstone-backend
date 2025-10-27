@@ -4,9 +4,11 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const crypto = require('crypto');
+const { Resend } = require('resend');
 require('dotenv').config();
 
 const User = require('./models/User')
+const { passwordResetEmail } = require('./emailTemplates');
 
 const app = express();
 
@@ -29,6 +31,8 @@ if(!JWT_SECRET){
     console.error('JWT_SECRET is not defined in .env file');
     process.exit(1);
 }
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 function authenticateToken(req, res, next){
     const authHeader = req.headers['authorization'];
@@ -177,56 +181,129 @@ app.post('/api/login', async(req, res) => {
     }
 });
 
-app.post('/api/verify-username', async (req, res) => {
-    try {
-        const { username } = req.body;
+app.post('/api/forgot-password', async (req, res) => {
+    try{
+        const { email } = req.body;
 
-        if(!username) {
+        if(!email){
             return res.status(400).json({
-                error: 'Please provide your username'
-            });
-        }
-        const user = await User.findOne({ username });
-
-        if(!user) {
-            return res.status(404).json({
-                error: 'Username not found'
+                error: 'Please provide your email address'
             });
         }
 
-        res.json({
-            message: 'Username verified',
-            email: user.email
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+        const successMessage = 'If an account exists with this email, you will receive a password reset link.';
+
+        if(!user){
+            return res.json({ message: successMessage });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+        
+        user.resetPasswordToken = hashedToken;
+        user.resetPasswordExpires = Date.now() + 3600000;
+        await user.save();
+
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+        const { data, error } = await resend.emails.send({
+            from: 'Cashvelo <onboarding@resend.dev>',
+            to: user.email,
+            subject: 'Password Reset Request - Cashvelo',
+            html:  passwordResetEmail(user.username, resetUrl)
         });
-    }   catch (error) {
-        console.error('Verify username error:', error);
+
+        if(error){
+            console.error('Resend email error:', error);
+            return res.status(500).json({
+                error: 'Failed to send email. Please try again.'
+            });
+        }
+        console.log('========================================');
+        console.log('📧 Password Reset Email Sent via Resend');
+        console.log('To:', user.email);
+        console.log('Email ID:', data?.id);
+        console.log('========================================');
+
+        res.json({ message: successMessage });
+    } catch(error){
+        console.error('Forgot password error:', error);
         res.status(500).json({
             error: 'An error occurred. Please try again.'
         });
     }
 });
 
-app.post('/api/forgot-password-reset', async (req, res) => {
-    try {
-        const { username, password } = req.body;
+app.get('/api/verify-reset-token/:token', async (req, res) => {
+    try{
+        const { token } = req.params;
 
-        if(!username || !password ) {
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if(!user){
             return res.status(400).json({
-                error: 'Please provide username and new password'
+                valid: false,
+                error: 'Invalid or expired reset token'
+            });
+        }
+
+        res.json({
+            valid: true,
+            email: user.email
+        });
+    } catch(error){
+        console.error('Verify token error:', error);
+        res.status(500).json({
+            valid: false,
+            error: 'An error occured'
+        });
+    }
+});
+
+app.post('/api/reset-password/:token', async (req, res) => {
+    try{
+        const { token } = req.params;
+        const { password } = req.body;
+
+        if(!password){
+            return res.status(400).json({
+                error: 'Please provide a new password'
             });
         }
 
         if(password.length < 6){
             return res.status(400).json({
-                error: 'Password must be at least 6 characters'
+                error: 'Password must be at least 6 characters' 
             });
         }
 
-        const user = await User.findOne({ username });
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
 
         if(!user){
-            return res.status(404).json({
-                error: 'Username not found'
+            return res.status(400).json({
+                error: 'Invalid or expired reset token'
             });
         }
 
@@ -234,15 +311,17 @@ app.post('/api/forgot-password-reset', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
         await user.save();
 
-        console.log('Password reset successful for:', username);
+        console.log('✅ Password reset successful for:', user.email);
 
-        res.json({ 
-            message: 'Password has been reset successfully' 
+        res.json({
+            message: 'Password has been reset successfully'
         });
-    }   catch (error){
-        console.error('Forgot password reset error:', error);
+    } catch(error){
+        console.error('Reset password error:', error);
         res.status(500).json({
             error: 'An error occurred. Please try again.'
         });
