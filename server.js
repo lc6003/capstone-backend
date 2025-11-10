@@ -82,7 +82,7 @@ app.post('/api/signup', async(req, res) => {
 
         if (existingUser){
             if (existingUser.email === email) {
-                return res.status(409).json({ error: 'Email already registered' });
+                return res.status(409).json({ error: 'Unable to create an account!' });
             }
             return res.status(409).json({ error: 'Username already taken' });
         }
