@@ -7,8 +7,14 @@ const crypto = require('crypto');
 const { Resend } = require('resend');
 require('dotenv').config();
 
-const User = require('./models/User')
+const User = require('./models/User');
 const { passwordResetEmail } = require('./emailTemplates');
+const { authenticateToken } = require('./middleware/auth');
+
+const budgetRoutes = require('./routes/budgets');
+const expenseRoutes = require('./routes/expenses');
+const creditCardRoutes = require('./routes/creditCards');
+const incomeRoutes = require('./routes/income');
 
 const app = express();
 
@@ -32,24 +38,7 @@ if(!JWT_SECRET){
     process.exit(1);
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-function authenticateToken(req, res, next){
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if(!token){
-        return res.status(401).json({ error: 'Access token required'});
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if(err){
-            return res.status(403).json({error: 'Invalid or expired token'});
-        }
-        req.user = user;
-        next();
-    });
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post('/api/signup', async(req, res) => {
     try{
@@ -125,7 +114,7 @@ app.post('/api/signup', async(req, res) => {
             error: 'An error occured during signup'
         });
     }
-})
+});
 
 app.post('/api/login', async(req, res) => {
     try{
@@ -329,47 +318,52 @@ app.post('/api/reset-password/:token', async (req, res) => {
 });
 
 app.get('/api/user', authenticateToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    try {
+        const user = await User.findById(req.user.userId).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-    res.json({ 
-      user: {
-        id: user._id,
-        username: user.username,
-        fullName: user.fullName,
-        email: user.email,
-        createdAt: user.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ error: 'An error occurred' });
-  }
+        res.json({ 
+            user: {
+                id: user._id,
+                username: user.username,
+                fullName: user.fullName,
+                email: user.email,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({ error: 'An error occurred' });
+    }
 });
 
 app.post('/api/logout', authenticateToken, (req, res) => {
     res.json({ message: 'Logged out successfully' });
 });
 
+app.use('/api/budgets', budgetRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/credit-cards', creditCardRoutes);
+app.use('/api/income', incomeRoutes);
+
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
+    res.json({ 
+        status: 'ok', 
+        message: 'Server is running',
+        timestamp: new Date().toISOString()
+    });
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);
 });
