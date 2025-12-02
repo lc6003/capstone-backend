@@ -8,6 +8,10 @@ const { Resend } = require('resend');
 require('dotenv').config();
 
 const User = require('./models/User');
+const Budget = require('./models/Budget');
+const Expense = require('./models/Expense');
+const CreditCard = require('./models/CreditCard');
+const Income = require('./models/Income');
 const { passwordResetEmail } = require('./emailTemplates');
 const { authenticateToken } = require('./middleware/auth');
 
@@ -336,6 +340,74 @@ app.get('/api/user', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Get user error:', error);
+        res.status(500).json({ error: 'An error occurred' });
+    }
+});
+
+app.put('/api/user', authenticateToken, async (req, res) => {
+    try {
+        const { username, fullName, email } = req.body;
+
+        if (!username || !email) {
+            return res.status(400).json({ 
+                error: 'Username and email are required' 
+            });
+        }
+
+        const existingUser = await User.findOne({
+            $or: [{ email }, { username }],
+            _id: { $ne: req.user.userId }
+        });
+
+        if (existingUser) {
+            if (existingUser.email === email) {
+                return res.status(409).json({ error: 'Email already in use' });
+            }
+            return res.status(409).json({ error: 'Username already taken' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user.userId,
+            { username, fullName, email },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: {
+                id: user._id,
+                username: user.username,
+                fullName: user.fullName,
+                email: user.email,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({ error: 'An error occurred' });
+    }
+});
+
+// Delete user account
+app.delete('/api/user', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        await Promise.all([
+            User.findByIdAndDelete(userId),
+            Budget.deleteMany({ userId }),
+            Expense.deleteMany({ userId }),
+            CreditCard.deleteMany({ userId }),
+            Income.deleteMany({ userId })
+        ]);
+
+        res.json({ message: 'Account deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
         res.status(500).json({ error: 'An error occurred' });
     }
 });
