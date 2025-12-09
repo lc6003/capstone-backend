@@ -12,6 +12,7 @@ const Budget = require('./models/Budget');
 const Expense = require('./models/Expense');
 const CreditCard = require('./models/CreditCard');
 const Income = require('./models/Income');
+const Goal = require('./models/Goal');
 const { passwordResetEmail } = require('./emailTemplates');
 const { authenticateToken } = require('./middleware/auth');
 
@@ -19,6 +20,7 @@ const budgetRoutes = require('./routes/budgets');
 const expenseRoutes = require('./routes/expenses');
 const creditCardRoutes = require('./routes/creditCards');
 const incomeRoutes = require('./routes/income');
+const goalRoutes = require('./routes/goals');
 
 const app = express();
 
@@ -402,7 +404,8 @@ app.delete('/api/user', authenticateToken, async (req, res) => {
             Budget.deleteMany({ userId }),
             Expense.deleteMany({ userId }),
             CreditCard.deleteMany({ userId }),
-            Income.deleteMany({ userId })
+            Income.deleteMany({ userId }),
+            Goal.deleteMany({ userId })
         ]);
 
         res.json({ message: 'Account deleted successfully' });
@@ -420,6 +423,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/income', incomeRoutes);
+app.use('/api/goals', goalRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ 
