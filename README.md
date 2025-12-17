@@ -1,19 +1,37 @@
-# capstone-backend
-Cashvelo's backend repo
+# Cashvelo Backend
 
-#   How to Setup Locally
+## Project Idea
 
-Clone the repo and then 
+Cashvelo is a personal finance web app that helps users manage their money in a simple and organized way. It allows users to budget using an envelope-style system, track expenses and income, manage credit card balances, and understand their spending more easily.The app also includes a cash stuffing feature, which lets users organize physical cash into envelopes and track cash movements between them. Users can create budgets, add expenses and income, and view their financial information through clear dashboards and charts. Cashvelo also offers language options (English and Spanish), light and dark mode, and secure user login, making the app accessible and customizable for different users.
 
-npm install
+## Frontend Link
 
-Create a .env file in the capstone-backend folder. Don't commit your .env file. Everyone's .env file is suppose to be different
-If you need help send me a message
+[https://github.com/lc6003/capstone-frontend]
 
-You will also need to download MongoDB
+## Technologies Used
 
-npm run dev to run the backend server locally
+- **Node.js**
+- **Express.js**
+- **MongoDB**
+- **Mongoose**
+- **JWT(jsonwebtoken)**
+- **bcrypt**
+- **Resend API**
+- **CORS**
 
-If you want to run both frontend and backend you need to npm run dev both the frontend and the backend
+### Installation
 
-Link to frontend repo: https://github.com/lc6003/capstone-frontend
+1. Download MongoDB and email me for the .env file
+
+2. Clone the repository:
+   git clone the repo
+   cd to the repo
+
+3. Install dependencies:
+   npm install
+
+4. Create the .env file based off of the .env file I provide you
+
+5. Run the Project Locally:
+   npm run dev
+
