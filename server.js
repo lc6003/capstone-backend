@@ -10,14 +10,12 @@ require('dotenv').config();
 const User = require('./models/User');
 const Budget = require('./models/Budget');
 const Expense = require('./models/Expense');
-const CreditCard = require('./models/CreditCard');
 const Income = require('./models/Income');
 const { passwordResetEmail } = require('./emailTemplates');
 const { authenticateToken } = require('./middleware/auth');
 
 const budgetRoutes = require('./routes/budgets');
 const expenseRoutes = require('./routes/expenses');
-const creditCardRoutes = require('./routes/creditCards');
 const incomeRoutes = require('./routes/income');
 
 const app = express();
@@ -401,7 +399,6 @@ app.delete('/api/user', authenticateToken, async (req, res) => {
             User.findByIdAndDelete(userId),
             Budget.deleteMany({ userId }),
             Expense.deleteMany({ userId }),
-            CreditCard.deleteMany({ userId }),
             Income.deleteMany({ userId })
         ]);
 
@@ -418,7 +415,6 @@ app.post('/api/logout', authenticateToken, (req, res) => {
 
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/expenses', expenseRoutes);
-app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/income', incomeRoutes);
 
 app.get('/api/health', (req, res) => {
