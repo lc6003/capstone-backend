@@ -24,14 +24,14 @@ Cashvelo is a personal finance web app that helps users manage their money in a 
 1. Download MongoDB and email me for the .env file
 
 2. Clone the repository:
-   git clone the repo
-   cd to the repo
+- git clone the repo
+- cd to the repo
 
 3. Install dependencies:
-   npm install
+- npm install
 
 4. Create the .env file based off of the .env file I provide you
 
 5. Run the Project Locally:
-   npm run dev
+- npm run dev
 
