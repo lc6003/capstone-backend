@@ -4,12 +4,13 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+//Get all income for the authenticated user
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const { type } = req.query;
         const query = { userId: req.user.userId };
 
-        if (type) {
+        if (type) {//Filter by income type if provided
             query.type = type;
         }
 
@@ -21,6 +22,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Create a new income
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { type, amount } = req.body;
@@ -29,7 +31,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Type and amount are required' });
         }
 
-        const income = new Income({
+        const income = new Income({//Create a new income with user id
             userId: req.user.userId,
             type,
             amount
@@ -43,9 +45,10 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Delete an income
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const income = await Income.findOneAndDelete({
+        const income = await Income.findOneAndDelete({//Delete only if income belongs to this user
             _id: req.params.id,
             userId: req.user.userId
         });

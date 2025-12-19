@@ -35,3 +35,5 @@ Cashvelo is a personal finance web app that helps users manage their money in a 
 5. Run the Project Locally:
 - npm run dev
 
+6. Make sure the backend and the frontend is running at the same time
+
