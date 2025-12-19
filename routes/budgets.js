@@ -4,9 +4,10 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+//Get all budget for the authenticated user
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const budgets = await Budget.find({ userId: req.user.userId });
+        const budgets = await Budget.find({ userId: req.user.userId });//find all budget belonging to this user
         res.json(budgets);
     } catch (error) {
         console.error('Get budgets error:', error);
@@ -14,6 +15,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Create new budget
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { name, limit, type } = req.body;
@@ -22,7 +24,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Name and type are required' });
         }
 
-        const budget = new Budget({
+        const budget = new Budget({//create new budget with userid
             userId: req.user.userId,
             name,
             limit: limit || 0,
@@ -37,9 +39,10 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Delete a budget
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const budget = await Budget.findOneAndDelete({
+        const budget = await Budget.findOneAndDelete({//delete only if budget belongs to this user
             _id: req.params.id,
             userId: req.user.userId
         });

@@ -20,12 +20,14 @@ const incomeRoutes = require('./routes/income');
 
 const app = express();
 
+//Middleware setup
 app.use(express.json());
 app.use(cors({
     origin: 'http://localhost:5173',
     credentials: true
 }));
 
+//MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -33,6 +35,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error', err));
 
+//Check JWT secret exists
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if(!JWT_SECRET){
@@ -40,8 +43,10 @@ if(!JWT_SECRET){
     process.exit(1);
 }
 
+//Resend email service
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+//Register new user account
 app.post('/api/signup', async(req, res) => {
     try{
         const {username, fullName, email, password} = req.body;
@@ -67,6 +72,7 @@ app.post('/api/signup', async(req, res) => {
             });
         }
 
+        //Check if user already exists
         const existingUser = await User.findOne({ 
             $or: [{ email }, { username }] 
         });
@@ -78,9 +84,11 @@ app.post('/api/signup', async(req, res) => {
             return res.status(409).json({ error: 'Username already taken' });
         }
 
+        //Hash password
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+        //Create new user
         const newUser = new User({
             username,
             fullName: fullName || username,
@@ -90,6 +98,7 @@ app.post('/api/signup', async(req, res) => {
 
         await newUser.save();
 
+        //Generate JWT token
         const token = jwt.sign(
             {
                 userId: newUser._id, 
@@ -118,6 +127,7 @@ app.post('/api/signup', async(req, res) => {
     }
 });
 
+//Authenticate user and generate JWT token
 app.post('/api/login', async(req, res) => {
     try{
         const {email, password} = req.body;
@@ -128,6 +138,7 @@ app.post('/api/login', async(req, res) => {
             });
         }
 
+        //Find user by email
         const user = await User.findOne({ email });
 
         if(!user){
@@ -136,6 +147,7 @@ app.post('/api/login', async(req, res) => {
             });
         }
 
+        //Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
 
         if (!isValidPassword) {
@@ -144,6 +156,7 @@ app.post('/api/login', async(req, res) => {
             });
         }
 
+        //Generate JWT token
         const token = jwt.sign(
             {
                 userId: user._id, 
@@ -172,6 +185,7 @@ app.post('/api/login', async(req, res) => {
     }
 });
 
+//Send password reset email to user
 app.post('/api/forgot-password', async (req, res) => {
     try{
         const { email } = req.body;
@@ -184,25 +198,30 @@ app.post('/api/forgot-password', async (req, res) => {
 
         const user = await User.findOne({ email: email.toLowerCase().trim() });
 
+        //Message to not give away if an account exist or not
         const successMessage = 'If an account exists with this email, you will receive a password reset link.';
 
         if(!user){
             return res.json({ message: successMessage });
         }
 
+        //Generate reset token
         const resetToken = crypto.randomBytes(32).toString('hex');
 
+        //Hash token for storage
         const hashedToken = crypto
             .createHash('sha256')
             .update(resetToken)
             .digest('hex');
         
-        user.resetPasswordToken = hashedToken;
+        user.resetPasswordToken = hashedToken; //save hashed token and expiration (1 hr)
         user.resetPasswordExpires = Date.now() + 3600000;
         await user.save();
 
+        //Create reset url with unhashed token
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
+        //Send email through Resend 
         const { data, error } = await resend.emails.send({
             from: 'Cashvelo <onboarding@resend.dev>',
             to: user.email,
@@ -217,7 +236,7 @@ app.post('/api/forgot-password', async (req, res) => {
             });
         }
         console.log('========================================');
-        console.log('📧 Password Reset Email Sent via Resend');
+        console.log('Password Reset Email Sent via Resend');
         console.log('To:', user.email);
         console.log('Email ID:', data?.id);
         console.log('========================================');
@@ -231,16 +250,18 @@ app.post('/api/forgot-password', async (req, res) => {
     }
 });
 
+//Verify if password reset token is valid
 app.get('/api/verify-reset-token/:token', async (req, res) => {
     try{
         const { token } = req.params;
 
+        //Hash token to match stored version
         const hashedToken = crypto
             .createHash('sha256')
             .update(token)
             .digest('hex');
 
-        const user = await User.findOne({
+        const user = await User.findOne({//find user with valid token
             resetPasswordToken: hashedToken,
             resetPasswordExpires: { $gt: Date.now() }
         });
@@ -265,12 +286,13 @@ app.get('/api/verify-reset-token/:token', async (req, res) => {
     }
 });
 
+//Reset user password with valid token
 app.post('/api/reset-password/:token', async (req, res) => {
     try{
         const { token } = req.params;
         const { password } = req.body;
 
-        if(!password){
+        if(!password){//Validate new password
             return res.status(400).json({
                 error: 'Please provide a new password'
             });
@@ -282,12 +304,12 @@ app.post('/api/reset-password/:token', async (req, res) => {
             });
         }
 
-        const hashedToken = crypto
+        const hashedToken = crypto//Hash token to match stored version
             .createHash('sha256')
             .update(token)
             .digest('hex');
 
-        const user = await User.findOne({
+        const user = await User.findOne({//Find user with valid token
             resetPasswordToken: hashedToken,
             resetPasswordExpires: { $gt: Date.now() }
         });
@@ -298,15 +320,15 @@ app.post('/api/reset-password/:token', async (req, res) => {
             });
         }
 
-        const saltRounds = 10;
+        const saltRounds = 10;//Hash new password
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        user.password = hashedPassword;
+        user.password = hashedPassword;//update password and clear reset token
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         await user.save();
 
-        console.log('✅ Password reset successful for:', user.email);
+        console.log('Password reset successful for:', user.email);
 
         res.json({
             message: 'Password has been reset successfully'
@@ -319,9 +341,10 @@ app.post('/api/reset-password/:token', async (req, res) => {
     }
 });
 
+//Get authenticated user's profile
 app.get('/api/user', authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).select('-password');
+        const user = await User.findById(req.user.userId).select('-password');//Get user with password field
         
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -342,6 +365,7 @@ app.get('/api/user', authenticateToken, async (req, res) => {
     }
 });
 
+//Update authenticated user's profile
 app.put('/api/user', authenticateToken, async (req, res) => {
     try {
         const { username, fullName, email } = req.body;
@@ -352,7 +376,7 @@ app.put('/api/user', authenticateToken, async (req, res) => {
             });
         }
 
-        const existingUser = await User.findOne({
+        const existingUser = await User.findOne({//Checking if username or email is taken already
             $or: [{ email }, { username }],
             _id: { $ne: req.user.userId }
         });
@@ -364,7 +388,7 @@ app.put('/api/user', authenticateToken, async (req, res) => {
             return res.status(409).json({ error: 'Username already taken' });
         }
 
-        const user = await User.findByIdAndUpdate(
+        const user = await User.findByIdAndUpdate(//update user profile
             req.user.userId,
             { username, fullName, email },
             { new: true, runValidators: true }
@@ -395,7 +419,7 @@ app.delete('/api/user', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
 
-        await Promise.all([
+        await Promise.all([//Delete all data
             User.findByIdAndDelete(userId),
             Budget.deleteMany({ userId }),
             Expense.deleteMany({ userId }),
@@ -409,14 +433,17 @@ app.delete('/api/user', authenticateToken, async (req, res) => {
     }
 });
 
+//Logout user
 app.post('/api/logout', authenticateToken, (req, res) => {
     res.json({ message: 'Logged out successfully' });
 });
 
+//Mount route modules
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/income', incomeRoutes);
 
+//Check if backend is running
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
@@ -425,13 +452,15 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+//Error handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
+//Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📝 API endpoints available at http://localhost:${PORT}/api`);
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`API endpoints available at http://localhost:${PORT}/api`);
 });

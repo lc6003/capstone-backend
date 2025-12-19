@@ -4,9 +4,10 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+//Get all expenses for the authenticated user
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const expenses = await Expense.find({ userId: req.user.userId })
+        const expenses = await Expense.find({ userId: req.user.userId })//Find all expenses for this user sorted by newest first
             .sort({ date: -1 });
         res.json(expenses);
     } catch (error) {
@@ -15,6 +16,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Create a new expense
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { amount, category, date, note } = req.body;
@@ -23,7 +25,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Amount and date are required' });
         }
 
-        const expense = new Expense({
+        const expense = new Expense({//Create new expense with user id
             userId: req.user.userId,
             amount,
             category: category || '',
@@ -39,9 +41,10 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+//Delete an expense
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const expense = await Expense.findOneAndDelete({
+        const expense = await Expense.findOneAndDelete({//Delete only if expense belong to this user
             _id: req.params.id,
             userId: req.user.userId
         });
